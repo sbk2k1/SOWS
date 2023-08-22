@@ -39,6 +39,7 @@ pitch_o.set_unit("midi")
 pitch_o.set_tolerance(tolerance)
 
 print("*** starting recording")
+last_note = None
 while True:
     try:
         audiobuffer = stream.read(buffer_size)
@@ -108,13 +109,46 @@ while True:
             # notes[11] = B = reload (r)
 
             if note == "C":
-                pyautogui.press('w')
+                print("here")
+                if keyboard.is_pressed('W'):
+                    print("W is already pressed")
+                else:
+                    # remove a, s, d using keyboard
+                    keyboard.release('A')
+                    keyboard.release('S')
+                    keyboard.release('D')
+                    # press w
+                    keyboard.press('W')
             elif note == "C#":
-                pyautogui.press('a')
+                if keyboard.is_pressed('A'):
+                    pass
+                else:
+                    # remove w, s, d
+                    keyboard.release('W')
+                    keyboard.release('S')
+                    keyboard.release('D')
+                    # press a
+                    keyboard.press('A')
             elif note == "D":
-                pyautogui.press('s')
+                if keyboard.is_pressed('S'):
+                    pass
+                else:
+                    # remove w, a, d
+                    keyboard.release('W')
+                    keyboard.release('A')
+                    keyboard.release('D')
+                    # press s
+                    keyboard.press('S')
             elif note == "D#":
-                pyautogui.press('d')
+                if keyboard.is_pressed('D'):
+                    pass
+                else:
+                    # remove w, a, s
+                    keyboard.release('W')
+                    keyboard.release('A')
+                    keyboard.release('S')
+                    # press d
+                    keyboard.press('D')
             elif note == "E":
                 # move mouse left by 45 degrees at DPI of 1000
                 pyautogui.move(-22.5, 0)
@@ -128,17 +162,19 @@ while True:
                 # move mouse right by 90 degrees at DPI of 1000
                 pyautogui.move(45, 0)
             elif note == "G#":
-                pyautogui.press('space')
+                keyboard.press('space')
             elif note == "A":
-                # toggle crouch
+                # toggle crouch using keyboard
                 if keyboard.is_pressed('ctrl'):
-                    pyautogui.keyUp('ctrl')
+                    keyboard.release('ctrl')
                 else:
-                    pyautogui.keyDown('ctrl')
+                    keyboard.press('ctrl')
             elif note == "A#":
                 pyautogui.click()
             elif note == "B":
                 pyautogui.press('r')
+
+            last_note = note
 
         if outputsink:
             outputsink(signal, len(signal))
@@ -147,6 +183,7 @@ while True:
             total_frames += len(signal)
             if record_duration * samplerate < total_frames:
                 break
+
     except KeyboardInterrupt:
         print("*** Ctrl+C pressed, exiting")
         break
