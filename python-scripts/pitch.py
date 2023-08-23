@@ -4,6 +4,7 @@ import numpy as np
 import aubio
 import pyautogui
 import keyboard
+import time
 
 # initialise pyaudio
 p = pyaudio.PyAudio()
@@ -39,7 +40,19 @@ pitch_o.set_unit("midi")
 pitch_o.set_tolerance(tolerance)
 
 print("*** starting recording")
+
+
+# action programming
 last_note = None
+# movement[0] is forward/backward and movement[1] is left/right
+movement = [None, None]
+# crouched
+crouched = False
+# managing sustained notes
+note_triggered = set()
+
+
+# main loop
 while True:
     try:
         audiobuffer = stream.read(buffer_size)
@@ -86,95 +99,132 @@ while True:
             # Use reference frequency of E2 (82.41 Hz)
             frequency = 82.41 * (2 ** (note_index / 12)) * (2 ** octave)
 
-            print("Aubio Pitch: {} / {} / {} / {}".format(pitch,
-                  note, octave, frequency))
+            print(note)
+            if note not in note_triggered:
+                note_triggered.add(note)
+                # mapping actions to notes
 
-            # mapping actions to notes
+                # WASD movement in games first
 
-            # WASD movement in games first
+                # notes[0] = C = W
+                # notes[1] = C# = A
+                # notes[2] = D = S
+                # notes[3] = D# = D
 
-            # notes[0] = C = W
-            # notes[1] = C# = A
-            # notes[2] = D = S
-            # notes[3] = D# = D
+                # notes[4] = E = turn left 45 degrees
+                # notes[5] = F = turn right 45 degrees
+                # notes[6] = F# = turn left 90 degrees
+                # notes[7] = G = turn right 90 degrees
 
-            # notes[4] = E = turn left 45 degrees
-            # notes[5] = F = turn right 45 degrees
-            # notes[6] = F# = turn left 90 degrees
-            # notes[7] = G = turn right 90 degrees
+                # notes[8] = G# = jump (space)
+                # notes[9] = A = crouch (ctrl)
+                # notes[10] = A# = shoot (left click)
+                # notes[11] = B = reload (r)
 
-            # notes[8] = G# = jump (space)
-            # notes[9] = A = crouch (ctrl)
-            # notes[10] = A# = shoot (left click)
-            # notes[11] = B = reload (r)
+                if note == "C":
+                    # check if w is already pressed
+                    # if it is, do nothing
+                    # if it isn't, check if character is moving backwards
+                    # if it is, release s and stop moving backwards
+                    # if it isn't, press w and start moving forwards
+                    if movement[0] == "W":
+                        print("W is already pressed")
+                    else:
+                        if movement[0] == "S":
+                            print("Releasing S")
+                            movement[0] = None
+                            keyboard.release('S')
+                        else:
+                            print("Pressing W")
+                            movement[0] = "W"
+                            keyboard.press('W')
+                elif note == "C#":
+                    # check if a is already pressed
+                    # if it is, do nothing
+                    # if it isn't, check if character is moving right
+                    # if it is, release d and stop moving right
+                    # if it isn't, press a and start moving left
+                    if movement[1] == "A":
+                        print("A is already pressed")
+                    else:
+                        if movement[1] == "D":
+                            print("Releasing D")
+                            movement[1] = None
+                            keyboard.release('D')
+                        else:
+                            print("Pressing A")
+                            movement[1] = "A"
+                            keyboard.press('A')
+                elif note == "D":
+                    # check if s is already pressed
+                    # if it is, do nothing
+                    # if it isn't, check if character is moving forwards
+                    # if it is, release w and stop moving forwards
+                    # if it isn't, press s and start moving backwards
+                    if movement[0] == "S":
+                        print("S is already pressed")
+                    else:
+                        if movement[0] == "W":
+                            print("Releasing W")
+                            movement[0] = None
+                            keyboard.release('W')
+                        else:
+                            print("Pressing S")
+                            movement[0] = "S"
+                            keyboard.press('S')
+                elif note == "D#":
+                    # check if d is already pressed
+                    # if it is, do nothing
+                    # if it isn't, check if character is moving left
+                    # if it is, release a and stop moving left
+                    # if it isn't, press d and start moving right
+                    if movement[1] == "D":
+                        print("D is already pressed")
+                    else:
+                        if movement[1] == "A":
+                            print("Releasing A")
+                            movement[1] = None
+                            keyboard.release('A')
+                        else:
+                            print("Pressing D")
+                            movement[1] = "D"
+                            keyboard.press('D')
+                elif note == "E":
+                    # move mouse left by 45 degrees at DPI of 1000
+                    if last_note != "E":
+                        pyautogui.move(-22.5, 0)
+                elif note == "F":
+                    # move mouse right by 45 degrees at DPI of 1000
+                    if last_note != "F":
+                        pyautogui.move(22.5, 0)
+                elif note == "F#":
+                    # move mouse left by 90 degrees at DPI of 1000
+                    if last_note != "F#":
+                        pyautogui.move(-45, 0)
+                elif note == "G":
+                    # move mouse right by 90 degrees at DPI of 1000
+                    if last_note != "G":
+                        pyautogui.move(45, 0)
+                elif note == "G#":
+                    keyboard.press('space')
+                elif note == "A":
+                    # toggle crouch using keyboard
+                    if crouched == True:
+                        print("Releasing ctrl")
+                        crouched = False
+                        keyboard.release('ctrl')
+                    else:
+                        print("Pressing ctrl")
+                        crouched = True
+                        keyboard.press('ctrl')
+                elif note == "A#":
+                    pyautogui.click()
+                elif note == "B":
+                    pyautogui.press('R')
 
-            if note == "C":
-                print("here")
-                if keyboard.is_pressed('W'):
-                    print("W is already pressed")
-                else:
-                    # remove a, s, d using keyboard
-                    keyboard.release('A')
-                    keyboard.release('S')
-                    keyboard.release('D')
-                    # press w
-                    keyboard.press('W')
-            elif note == "C#":
-                if keyboard.is_pressed('A'):
-                    pass
-                else:
-                    # remove w, s, d
-                    keyboard.release('W')
-                    keyboard.release('S')
-                    keyboard.release('D')
-                    # press a
-                    keyboard.press('A')
-            elif note == "D":
-                if keyboard.is_pressed('S'):
-                    pass
-                else:
-                    # remove w, a, d
-                    keyboard.release('W')
-                    keyboard.release('A')
-                    keyboard.release('D')
-                    # press s
-                    keyboard.press('S')
-            elif note == "D#":
-                if keyboard.is_pressed('D'):
-                    pass
-                else:
-                    # remove w, a, s
-                    keyboard.release('W')
-                    keyboard.release('A')
-                    keyboard.release('S')
-                    # press d
-                    keyboard.press('D')
-            elif note == "E":
-                # move mouse left by 45 degrees at DPI of 1000
-                pyautogui.move(-22.5, 0)
-            elif note == "F":
-                # move mouse right by 45 degrees at DPI of 1000
-                pyautogui.move(22.5, 0)
-            elif note == "F#":
-                # move mouse left by 90 degrees at DPI of 1000
-                pyautogui.move(-45, 0)
-            elif note == "G":
-                # move mouse right by 90 degrees at DPI of 1000
-                pyautogui.move(45, 0)
-            elif note == "G#":
-                keyboard.press('space')
-            elif note == "A":
-                # toggle crouch using keyboard
-                if keyboard.is_pressed('ctrl'):
-                    keyboard.release('ctrl')
-                else:
-                    keyboard.press('ctrl')
-            elif note == "A#":
-                pyautogui.click()
-            elif note == "B":
-                pyautogui.press('r')
-
-            last_note = note
+                last_note = note
+        else:
+            note_triggered.discard(last_note)
 
         if outputsink:
             outputsink(signal, len(signal))
@@ -185,6 +235,12 @@ while True:
                 break
 
     except KeyboardInterrupt:
+        # release all keys
+        keyboard.release('W')
+        keyboard.release('A')
+        keyboard.release('S')
+        keyboard.release('D')
+        keyboard.release('ctrl')
         print("*** Ctrl+C pressed, exiting")
         break
 
