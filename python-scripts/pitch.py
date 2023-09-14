@@ -18,7 +18,8 @@ stream = p.open(format=pyaudio_format,
                 channels=n_channels,
                 rate=samplerate,
                 input=True,
-                frames_per_buffer=buffer_size)
+                frames_per_buffer=buffer_size,
+                input_device_index=2)
 
 if len(sys.argv) > 1:
     # record 5 seconds
@@ -59,7 +60,6 @@ while True:
         signal = np.fromstring(audiobuffer, dtype=np.float32)
 
         pitch = pitch_o(signal)[0]
-
         if pitch > 0:
             # print floor pitch
             pitch = int(round(pitch))
@@ -120,6 +120,8 @@ while True:
                 # notes[9] = A = crouch (ctrl)
                 # notes[10] = A# = shoot (left click)
                 # notes[11] = B = reload (r)
+
+                print(note)
 
                 if note == "C":
                     # check if w is already pressed
