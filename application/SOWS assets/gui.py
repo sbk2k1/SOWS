@@ -9,27 +9,23 @@ import aubio
 import numpy as np
 import threading
 
-
-# audio settings
-buffer_size = 1024
-pyaudio_format = pyaudio.paFloat32
-n_channels = 1
-samplerate = 48000
 audio = pyaudio.PyAudio()
-stream = audio.open(format=pyaudio_format,
-            channels=n_channels,
-            rate=samplerate,
-            input=True,
-            frames_per_buffer=buffer_size)
-
-lowest_pitch = 21
-
 
 
 
 class Ui_MainWindow(object):
 
-    
+    def __init__(self):
+        super().__init__()
+        self.audio_thread = None
+        self.tuning_factor = 0
+        self.stream = None
+        # audio settings
+        self.buffer_size = 1024
+        self.pyaudio_format = pyaudio.paFloat32
+        self.n_channels = 1
+        self.samplerate = 48000
+        self.lowest_pitch = 5
     
     def setupUi(self, MainWindow):
         if MainWindow.objectName():
@@ -37,6 +33,8 @@ class Ui_MainWindow(object):
         MainWindow.resize(1225, 825)
         MainWindow.setMinimumSize(QSize(1225, 825))
         MainWindow.setMaximumSize(QSize(1225, 825))
+        # close event
+        MainWindow.closeEvent = self.closeEvent
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.comboBox = QComboBox(self.centralwidget)
@@ -71,6 +69,7 @@ class Ui_MainWindow(object):
 
         self.pushButton.setIcon(icon)
         self.pushButton.setIconSize(QSize(32, 30))
+        self.pushButton.clicked.connect(self.on_pushButton_clicked)
         self.pushButton_2 = QPushButton(self.centralwidget)
         self.pushButton_2.setObjectName(u"pushButton_2")
         self.pushButton_2.setGeometry(QRect(570, 760, 41, 41))
@@ -79,6 +78,7 @@ class Ui_MainWindow(object):
         icon1.addFile(u"no_signal.png", QSize(), QIcon.Normal, QIcon.Off)
         self.pushButton_2.setIcon(icon1)
         self.pushButton_2.setIconSize(QSize(32, 20))
+
         self.tableWidget = QTableWidget(self.centralwidget)
         if (self.tableWidget.columnCount() < 2):
             self.tableWidget.setColumnCount(2)
@@ -373,81 +373,21 @@ class Ui_MainWindow(object):
             "MainWindow", u"SOWS", None))
     # retranslateUi
 
-    def changeDriver(self):
-        # when driver is changed in combobox we update the stream
-        global audio_thread
-        # get the selected driver from the combo box
-        selectedDriver = self.comboBox.currentText()
-        # get the index of the driver
-        selectedDriverIndex = selectedDriver.split(".")[0]
+    # when push button 2 is clicked. we disable entire gui 
+    # by drawing a grey transparent overlay over the gui
+    # and start listening for audio
+    # when a note is detected we call the handleAudioSignal function and pass the note
+    # and re-enable the gui. we use this to tune the application to the lowest note
+    # and then we can use the table to map the notes to actions
 
-        try:
-            # stop the audio thread if alive
-            if audio_thread.is_alive():
-                audio_thread.stop()
-                audio_thread.join()
-        except:
-            pass
+    def on_pushButton_clicked(self):
+        
+        # transparent overlay to block gui
+        print("hello    ")
+        self.pushButton.setEnabled(False)
+        self.comboBox.setEnabled(False)
+        self.pushButton.setEnabled(False)
 
-        try:
-            stream = audio.open(format=pyaudio_format,
-                    channels=n_channels,
-                    rate=samplerate,
-                    input=True,
-                    frames_per_buffer=buffer_size,
-                    input_device_index=int(selectedDriverIndex))
-
-            # start audio thread
-            audio_thread = AudioProcessingThread()
-            #connect the signal to the handleAudioSignal function
-            audio_thread.signal_detected.connect(self.handleAudioSignal)
-            audio_thread.start()
-
-
-        except Exception as e:
-            print("Error changing driver")
-            print(e)
-    
-    def handleAudioSignal(self, note):
-        print(note)
-    
-    def updateSignalStatus(self, live):
-        #change the signal status icon to signal.png instead of no_signal.png
-        icon = QIcon()
-        if live == True:
-            icon.addFile(u"signal.png", QSize(), QIcon.Normal, QIcon.Off)
-            self.pushButton_2.setIcon(icon)
-        else:
-            icon.addFile(u"no_signal.png", QSize(), QIcon.Normal, QIcon.Off)
-            self.pushButton_2.setIcon(icon)
-    
-    def cleanup(self):
-        #stop audio thread if alive
-        if audio_thread.is_alive():
-            audio_thread.stop()
-            audio_thread.join()
-        #shutdown all threads
-        audio.terminate()
-        stream.stop_stream()
-        stream.close()
-        sys.exit()
-    
-    def closeEvent(self, event):
-        self.cleanup()
-        event.accept()
-
-class AudioProcessingThread(threading.Thread, QObject):
-
-    signal_detected = Signal(str)
-
-    def __init__(self):
-        threading.Thread.__init__(self)
-        QObject.__init__(self)
-
-    def stop(self):
-        self.stop_thread = True
-
-    def run(self):
         tolerance = 0.9
         win_s = 8192  # fft size
         hop_s = buffer_size  # hop size
@@ -464,19 +404,144 @@ class AudioProcessingThread(threading.Thread, QObject):
                     break
                 
                 pitch = pitch_o(signal)[0]
+
+                # this pitch is the low E string on a guitar
+
+                if pitch >0:
+                    pitch = int(round(pitch))
+                    notes = ["E", "F", "F#", "G", "G#", "A", "A#", "B", "C", "C#", "D", "D#"]
+
+                    # get tuning factor considering that the note was an E
+                    # this will be used to calculate the notes
+                    # we will get further notes relative to this note
+
+                    self.tuning_factor = lowest_pitch - pitch
+
+            except:
+                print("Error running")
+                break
+
+        self.pushButton.setEnabled(True)
+        self.comboBox.setEnabled(True)
+        self.pushButton.setEnabled(True)
+
+    def changeDriver(self):
+        
+        print(self.audio_thread)
+
+        if self.audio_thread:
+            print("Stopping thread")
+            self.audio_thread.stop()
+            self.audio_thread.join()
+            self.audio_thread = None
+        
+        # get the index of the driver
+        selectedDriver = self.comboBox.currentText()
+        selectedDriverIndex = selectedDriver.split(".")[0]
+
+        print(selectedDriverIndex)
+
+        try:
+
+            if self.stream:
+                self.stream.stop_stream()
+                self.stream.close()
+
+            self.stream = audio.open(format=self.pyaudio_format,
+                                channels=self.n_channels,
+                                rate=self.samplerate,
+                                input=True,
+                                frames_per_buffer=self.buffer_size,
+                                input_device_index=int(selectedDriverIndex))
+
+            # start audio thread
+            self.audio_thread = AudioProcessingThread(self.tuning_factor, self.buffer_size, self.samplerate, self.stream)
+            #connect the signal to the handleAudioSignal function
+            self.audio_thread.signal_detected.connect(self.handleAudioSignal)
+            self.audio_thread.start()
+
+            # update the signal status icon
+            self.updateSignalStatus(True)
+
+        except Exception as e:
+            print("Error changing driver")
+            self.updateSignalStatus(False)
+            print(e)
+    
+    def handleAudioSignal(self, note):
+        print(note)
+    
+    def updateSignalStatus(self, live):
+        #change the signal status icon to signal.png instead of no_signal.png
+        icon = QIcon()
+        if live == True:
+            icon.addFile(u"signal.png", QSize(), QIcon.Normal, QIcon.Off)
+            self.pushButton_2.setIcon(icon)
+        else:
+            icon.addFile(u"no_signal.png", QSize(), QIcon.Normal, QIcon.Off)
+            self.pushButton_2.setIcon(icon)
+    
+    # create
+    
+    # close all threads when main window is closed
+    def closeEvent(self, event):
+        if self.audio_thread:
+            self.audio_thread.stop()
+            self.audio_thread.join()
+            self.audio_thread = None
+        event.accept()
+
+    # now we have to bind the closeEvent function to the main window 
+    # so that it is called when the main window is closed
+    # we do this by adding the following line to the setupUi function
+    
+
+class AudioProcessingThread(threading.Thread, QObject):
+
+    signal_detected = Signal(str)
+
+    def __init__(self, tuning_factor, buffer_size, samplerate, stream):
+        threading.Thread.__init__(self)
+        QObject.__init__(self)
+        self.listening = True
+        self.tuning_factor = tuning_factor
+        self.buffer_size = buffer_size
+        self.samplerate = samplerate
+        self.stream = stream
+
+    def stop(self):
+        self.listening = False
+
+    def run(self):
+        tolerance = 0.9
+        win_s = 8192  # fft size
+        hop_s = self.buffer_size  # hop size
+        pitch_o = aubio.pitch("default", win_s, hop_s, self.samplerate)
+        pitch_o.set_unit("midi")
+        pitch_o.set_tolerance(tolerance)
+
+        while self.listening:
+            try:
+                aubiobuffer = self.stream.read(self.buffer_size)
+                signal = np.fromstring(aubiobuffer, dtype=np.float32)
+
+                if len(signal) == 0:
+                    break
+                
+                pitch = pitch_o(signal)[0]
                 print(pitch)
+
                 if pitch >0:
                     pitch = int(round(pitch))
                     notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
-                    # Calculate the octave and note
-                    octave = (pitch // 12) - 2  # Adjusted octave calculation
-                    note_index = pitch % 12
-                    note = notes[note_index]
-                    print(note, octave)
-            except:
-                print("Error running")
-                break
+                    # Calculate the octave and note relative to the tuning factor
+                    octave = int((pitch + self.tuning_factor) / 12) - 1
+                    note = notes[(pitch + self.tuning_factor) % 12]
+                    print(note)
+            except Exception as e:
+                print("Error getting pitch")
+                print(e)
     
 
 if __name__ == "__main__":
@@ -489,6 +554,7 @@ if __name__ == "__main__":
     MainWindow = QMainWindow()
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
+    # close 
     MainWindow.show()
 
     sys.exit(app.exec_())
