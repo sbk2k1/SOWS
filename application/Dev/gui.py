@@ -2,7 +2,7 @@ from PySide2.QtCore import (QCoreApplication, QMetaObject, QObject, QPoint,
                             QRect, QSize, QUrl, Qt, Signal, QEvent)
 from PySide2.QtGui import (QBrush, QColor, QConicalGradient, QCursor, QFont,
                            QFontDatabase, QIcon, QLinearGradient, QPalette, QPainter, QPixmap,
-                           QRadialGradient)
+                           QRadialGradient, QWindow, QKeyEvent)
 from PySide2.QtWidgets import *
 import pyaudio
 import keyboard
@@ -18,7 +18,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 
-class Ui_MainWindow(object):
+class Ui_MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
@@ -53,6 +53,7 @@ class Ui_MainWindow(object):
 
     
     def setupUi(self, MainWindow):
+
         if MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
         MainWindow.resize(1225, 825)
@@ -63,6 +64,8 @@ class Ui_MainWindow(object):
         MainWindow.closeEvent = self.closeEvent
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
+        # set tool window flag to hide it from taskbar
+        MainWindow.setWindowFlags(Qt.Tool)
 
 
         ###############################
@@ -305,15 +308,20 @@ class Ui_MainWindow(object):
         self.label_3.raise_()
         self.label_2.raise_()
 
+        
         self.retranslateUi(MainWindow)
 
         QMetaObject.connectSlotsByName(MainWindow)
     # setupUi
 
+    # retranslateUi
+
     # don't know what happens here. but it is important.
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate(
-            "MainWindow", u"MainWindow", None))
+            "MainWindow", u"SOWS", None))
+        MainWindow.setWindowFlags(Qt.WindowStaysOnTopHint)
+
 
         self.comboBox.setCurrentText(
             QCoreApplication.translate("MainWindow", u"Select Driver", None))
@@ -443,9 +451,49 @@ class Ui_MainWindow(object):
         self.label_2.setText(QCoreApplication.translate(
             "MainWindow", u"SOWS", None))
         self.label_3.setText(QCoreApplication.translate("MainWindow", u"---", None))
-        
-    # retranslateUi
 
+        # System Tray icon image
+        icon_image = os.path.join(script_dir, "signal.png")
+        icon1 = QIcon(icon_image)
+
+        # System Tray Icon
+        self.tray_icon = QSystemTrayIcon(MainWindow)
+        self.tray_icon.setIcon(icon1)
+        self.tray_icon.activated.connect(self.tray_activated)
+        self.tray_icon.show()
+
+        # add context menu to tray icon
+        self.tray_icon_menu = QMenu(MainWindow)
+
+        # Add actions to the menu
+        quit_action = QAction("Quit", MainWindow)
+        quit_action.triggered.connect(self.quit_application)
+        self.tray_icon_menu.addAction(quit_action)
+
+        # restore
+        restore_action = QAction("Restore", MainWindow)
+        restore_action.triggered.connect(self.show_window)
+        self.tray_icon_menu.addAction(restore_action)
+
+        # Add menu to tray icon
+        self.tray_icon.setContextMenu(self.tray_icon_menu)
+    
+    
+    def tray_activated(self, reason):
+        if reason == QSystemTrayIcon.Trigger:
+            MainWindow.showNormal()
+
+
+    def show_window(self):
+        # make window visible from tray icon
+        MainWindow.showNormal()
+
+
+    def quit_application(self):
+        self.tray_icon.hide()
+        # quit the application
+        QApplication.quit()
+    
     # function to handle the test button click
     def on_pushButton_clicked(self):
         if self.testing:
