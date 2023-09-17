@@ -1,15 +1,18 @@
 from PySide2.QtCore import (QCoreApplication, QMetaObject, QObject, QPoint,
-                            QRect, QSize, QUrl, Qt, Signal)
+                            QRect, QSize, QUrl, Qt, Signal, QEvent)
 from PySide2.QtGui import (QBrush, QColor, QConicalGradient, QCursor, QFont,
                            QFontDatabase, QIcon, QLinearGradient, QPalette, QPainter, QPixmap,
                            QRadialGradient)
 from PySide2.QtWidgets import *
 import pyaudio
+import keyboard
+import pyautogui
 import aubio
 import numpy as np
 import threading
 import os
 
+# initializations
 audio = pyaudio.PyAudio()
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -19,9 +22,11 @@ class Ui_MainWindow(object):
 
     def __init__(self):
         super().__init__()
+
+        # instances
         self.audio_thread = None
-        self.tuning_factor = 0
         self.stream = None
+
         # audio settings
         self.buffer_size = 1024
         self.pyaudio_format = pyaudio.paFloat32
@@ -29,6 +34,9 @@ class Ui_MainWindow(object):
         self.samplerate = 48000
         self.lowest_pitch = 5
         self.testing = False
+
+        # action instance
+        self.action_handler = ActionHandler()
         
         # get the image path
         self.background_image = os.path.join(script_dir, "background.jpg")
@@ -50,10 +58,18 @@ class Ui_MainWindow(object):
         MainWindow.resize(1225, 825)
         MainWindow.setMinimumSize(QSize(1225, 825))
         MainWindow.setMaximumSize(QSize(1225, 825))
+
         # close event
         MainWindow.closeEvent = self.closeEvent
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
+
+
+        ###############################
+        # COMBO BOX FOR DRIVERS
+        ###############################
+
+
         self.comboBox = QComboBox(self.centralwidget)
 
         # get all devices and add them to the combo box
@@ -73,6 +89,12 @@ class Ui_MainWindow(object):
         # when the driver is changed in the combo box we call the changeDriver function
         self.comboBox.currentIndexChanged.connect(self.changeDriver)
 
+
+
+        ###############################
+        # BUTTON FOR TESTING
+        ###############################
+
         self.pushButton = QPushButton(self.centralwidget)
         self.pushButton.setObjectName(u"pushButton")
         self.pushButton.setGeometry(QRect(620, 760, 61, 41))
@@ -87,6 +109,13 @@ class Ui_MainWindow(object):
         self.pushButton.setIcon(icon)
         self.pushButton.setIconSize(QSize(32, 30))
         self.pushButton.clicked.connect(self.on_pushButton_clicked)
+
+
+        ###############################
+        # BUTTON FOR SIGNAL STATUS
+        ###############################
+
+
         self.pushButton_2 = QPushButton(self.centralwidget)
         self.pushButton_2.setObjectName(u"pushButton_2")
         self.pushButton_2.setGeometry(QRect(570, 760, 41, 41))
@@ -95,6 +124,11 @@ class Ui_MainWindow(object):
         icon1.addFile(u"no_signal.png", QSize(), QIcon.Normal, QIcon.Off)
         self.pushButton_2.setIcon(icon1)
         self.pushButton_2.setIconSize(QSize(32, 20))
+
+
+        ###############################
+        # TABLE WIDGET FOR NOTES
+        ###############################
 
         self.tableWidget = QTableWidget(self.centralwidget)
         if (self.tableWidget.columnCount() < 2):
@@ -207,6 +241,8 @@ class Ui_MainWindow(object):
         self.tableWidget.setItem(11, 1, __qtablewidgetitem37)
         self.tableWidget.setObjectName(u"tableWidget")
         self.tableWidget.setGeometry(QRect(40, 170, 1001, 561))
+
+
         font1 = QFont()
         font1.setFamily(u"Montserrat")
         font1.setPointSize(16)
@@ -230,7 +266,7 @@ class Ui_MainWindow(object):
         # make the table fixed size
         self.tableWidget.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
 
-
+        # make the table not editable
         self.label = QLabel(self.centralwidget)
         self.label.setObjectName(u"label")
         self.label.setGeometry(QRect(0, 0, 1231, 831))
@@ -274,6 +310,7 @@ class Ui_MainWindow(object):
         QMetaObject.connectSlotsByName(MainWindow)
     # setupUi
 
+    # don't know what happens here. but it is important.
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate(
             "MainWindow", u"MainWindow", None))
@@ -409,6 +446,7 @@ class Ui_MainWindow(object):
         
     # retranslateUi
 
+    # function to handle the test button click
     def on_pushButton_clicked(self):
         if self.testing:
             # delete the thread
@@ -420,7 +458,7 @@ class Ui_MainWindow(object):
             self.updateSignalStatus(False)
 
             # restart the audio thread
-            self.audio_thread = AudioProcessingThread(self.tuning_factor, self.buffer_size, self.samplerate, self.stream)
+            self.audio_thread = AudioProcessingThread(self.buffer_size, self.samplerate, self.stream)
             self.audio_thread.signal_detected.connect(self.handleAudioSignal)
             self.audio_thread.start()
             self.updateSignalStatus(True)
@@ -429,6 +467,10 @@ class Ui_MainWindow(object):
             self.pushButton.setStyleSheet(u"background-color: rgba(225, 233, 245, 1);")
 
         else:
+
+            # release all keys
+            self.action_handler.releaseAll()
+
             #check if any thread is running
             if self.audio_thread:
                 self.audio_thread.stop()
@@ -436,7 +478,7 @@ class Ui_MainWindow(object):
                 self.audio_thread = None
 
             # start audio thread
-            self.audio_thread = AudioProcessingThread(self.tuning_factor, self.buffer_size, self.samplerate, self.stream)
+            self.audio_thread = AudioProcessingThread(self.buffer_size, self.samplerate, self.stream)
             self.audio_thread.signal_detected.connect(self.handleAudioSignal)
             self.audio_thread.start()
             self.testing = True
@@ -444,11 +486,8 @@ class Ui_MainWindow(object):
             # change button color
             self.pushButton.setStyleSheet(u"background-color: rgba(151, 153, 156, 1);")
 
-        
+    # function to change the driver    
     def changeDriver(self):
-        
-        print(self.audio_thread)
-
         if self.audio_thread:
             print("Stopping thread")
             self.audio_thread.stop()
@@ -458,8 +497,6 @@ class Ui_MainWindow(object):
         # get the index of the driver
         selectedDriver = self.comboBox.currentText()
         selectedDriverIndex = selectedDriver.split(".")[0]
-
-        print(selectedDriverIndex)
 
         try:
 
@@ -475,7 +512,7 @@ class Ui_MainWindow(object):
                                 input_device_index=int(selectedDriverIndex))
 
             # start audio thread
-            self.audio_thread = AudioProcessingThread(self.tuning_factor, self.buffer_size, self.samplerate, self.stream)
+            self.audio_thread = AudioProcessingThread(self.buffer_size, self.samplerate, self.stream)
             #connect the signal to the handleAudioSignal function
             self.audio_thread.signal_detected.connect(self.handleAudioSignal)
             self.audio_thread.start()
@@ -488,14 +525,18 @@ class Ui_MainWindow(object):
             self.updateSignalStatus(False)
             print(e)
     
+    # function to handle the audio signal
     def handleAudioSignal(self, note):
         # update the label_3 text
         if self.testing:
             self.label_3.setText(note)
         else:
             # the entire action programming based on note is done here
-            print(note)
+            # self.action_handler.handleAction(note)
+            keyboard.press_and_release("space")
+            # print(note)
     
+    # function to update the signal status icon
     def updateSignalStatus(self, live):
         #change the signal status icon to signal.png instead of no_signal.png
         icon = QIcon()
@@ -505,9 +546,7 @@ class Ui_MainWindow(object):
         else:
             icon.addFile(self.grey_signal, QSize(), QIcon.Normal, QIcon.Off)
             self.pushButton_2.setIcon(icon)
-    
-    # create
-    
+        
     # close all threads when main window is closed
     def closeEvent(self, event):
         if self.audio_thread:
@@ -516,35 +555,156 @@ class Ui_MainWindow(object):
             self.audio_thread = None
         event.accept()
 
-    # now we have to bind the closeEvent function to the main window 
-    # so that it is called when the main window is closed
-    # we do this by adding the following line to the setupUi function
-    
+# Filter class to prevent keyboard inputs interacting with the application
+class CustomEventFilter(QObject, ):
+    def eventFilter(self, obj, event):
+        # if the event is a key press event then we return true
+        prevent_list = ["PySide2.QtCore.QEvent.Type.KeyPress", "PySide2.QtCore.QEvent.Type.KeyRelease", "PySide2.QtCore.QEvent.Type.ShortcutOverride"]
 
+        event_type = str(event.type())
+        if event_type in prevent_list:
+            return True
+        else:
+            return False
+
+# class to handle all the actions.
+class ActionHandler(QObject):
+    
+        def __init__(self):
+            super().__init__()
+            self.action_mapping = {
+                "C": self.moveForward,
+                "C#": self.moveLeft,
+                "D": self.moveBackwards,
+                "D#": self.moveRight,
+                "E": self.turn45Left,
+                "F": self.turn45Right,
+                "F#": self.turn90Left,
+                "G": self.turn90Right,
+                "G#": self.jump,
+                "A": self.crouch,
+                "A#": self.shoot,
+                "B": self.reload
+            }
+
+            # handle front-back and left-right navigation
+            # Forward +1 and Backwards -1
+            # Left +1 and Right -1
+            self.navigation_mapping = [None, None]
+
+            # toggle for crouch
+            self.crouch_toggle = False
+        
+        def releaseAll(self):
+            keyboard.release('w')
+            keyboard.release('a')
+            keyboard.release('s')
+            keyboard.release('d')
+            keyboard.release('ctrl')
+        
+        def handleAction(self, note):
+            self.action_mapping[note]()
+
+        # function to move forward or stop moving backwards
+        def moveForward(self):
+            if self.navigation_mapping[0] == None:
+                self.navigation_mapping[0] = 1
+                keyboard.press('w')
+            elif self.navigation_mapping[0] == -1:
+                self.navigation_mapping[0] = None
+                keyboard.release('s')
+        
+        # function to move backwards or stop moving forward
+        def moveBackwards(self):
+            if self.navigation_mapping[0] == None:
+                self.navigation_mapping[0] = -1
+                keyboard.press('s')
+            elif self.navigation_mapping[0] == 1:
+                self.navigation_mapping[0] = None
+                keyboard.release('w')
+        
+        # function to move left or stop moving right
+        def moveLeft(self):
+            if self.navigation_mapping[1] == None:
+                self.navigation_mapping[1] = 1
+                keyboard.press('a')
+            elif self.navigation_mapping[1] == -1:
+                self.navigation_mapping[1] = None
+                keyboard.release('d')
+        
+        # function to move right or stop moving left
+        def moveRight(self):
+            if self.navigation_mapping[1] == None:
+                self.navigation_mapping[1] = -1
+                keyboard.press('d')
+            elif self.navigation_mapping[1] == 1:
+                self.navigation_mapping[1] = None
+                keyboard.release('a')
+        
+        def turn45Left(self):
+            print("Turning 45 degrees left")
+        
+        def turn45Right(self):
+            print("Turning 45 degrees right")
+        
+        def turn90Left(self):
+            print("Turning 90 degrees left")
+        
+        def turn90Right(self):
+            print("Turning 90 degrees right")
+        
+        def jump(self):
+            keyboard.press_and_release('space')
+        
+        # function to toggle crouch
+        def crouch(self):
+            if self.crouch_toggle == False:
+                self.crouch_toggle = True
+                keyboard.press('ctrl')
+            else:
+                self.crouch_toggle = False
+                keyboard.release('ctrl')
+        
+        def shoot(self):
+            # press and release left mouse button
+            pyautogui.click()
+        
+        def reload(self):
+            # press and release r
+            keyboard.press_and_release('r')
+
+# class to handle all the audio processing
 class AudioProcessingThread(threading.Thread, QObject):
 
+    # signal to emit when a note is detected
     signal_detected = Signal(str)
 
-    def __init__(self, tuning_factor, buffer_size, samplerate, stream):
+    def __init__(self, buffer_size, samplerate, stream):
         threading.Thread.__init__(self)
         QObject.__init__(self)
         self.listening = True
-        self.tuning_factor = tuning_factor
         self.buffer_size = buffer_size
         self.samplerate = samplerate
         self.stream = stream
 
+    # function to stop the thread
     def stop(self):
         self.listening = False
 
     def run(self):
+
+        # parameters for pitch detection
         tolerance = 0.9
         win_s = 8192  # fft size
         hop_s = self.buffer_size  # hop size
         pitch_o = aubio.pitch("default", win_s, hop_s, self.samplerate)
         pitch_o.set_unit("midi")
         pitch_o.set_tolerance(tolerance)
+        
+        # prevent sustain effect
+        last_note = None
 
+        # main loop
         while self.listening:
             try:
                 aubiobuffer = self.stream.read(self.buffer_size)
@@ -560,11 +720,15 @@ class AudioProcessingThread(threading.Thread, QObject):
                     notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
                     # Calculate the octave and note relative to the tuning factor
-                    octave = int((pitch + self.tuning_factor) / 12) - 1
-                    note = notes[(pitch + self.tuning_factor) % 12]
-                
-                    # Emit the signal
-                    self.signal_detected.emit(note + str(octave))
+                    octave = int((pitch) / 12) - 1
+                    note = notes[(pitch) % 12]
+
+                    if last_note != note:
+                        # Emit the signal
+                        self.signal_detected.emit(note)
+                        last_note = note
+                else:
+                    last_note = None
 
 
             except Exception as e:
@@ -582,12 +746,16 @@ if __name__ == "__main__":
     MainWindow = QMainWindow()
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
-    # close 
     MainWindow.show()
 
+    # install the event filter on the main window
+    CustomEventFilter = CustomEventFilter()
+    MainWindow.installEventFilter(CustomEventFilter)
+
+    # add event filter to all the widgets
+    for widget in MainWindow.findChildren(QWidget):
+        widget.installEventFilter(CustomEventFilter)
+
     sys.exit(app.exec_())
-    
-    #shutdown all threads
-    audio.terminate()
-    stream.stop_stream()
-    stream.close()
+    # run cleanup when the app is closed
+    MainWindow.closeEvent()
