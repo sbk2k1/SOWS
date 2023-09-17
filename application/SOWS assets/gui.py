@@ -26,6 +26,7 @@ class Ui_MainWindow(object):
         self.n_channels = 1
         self.samplerate = 48000
         self.lowest_pitch = 5
+        self.testing = False
     
     def setupUi(self, MainWindow):
         if MainWindow.objectName():
@@ -216,6 +217,20 @@ class Ui_MainWindow(object):
         self.label.setStyleSheet(u"background-image: url(background.jpg);\n"
                                  "background-repeat: no-repeat;\n"
                                  "")
+
+
+        self.label_3 = QLabel(self.centralwidget)
+        self.label_3.setObjectName(u"label_3")
+        self.label_3.setGeometry(QRect(690, 760, 81, 41))
+        font3 = QFont()
+        font3.setFamily(u"Montserrat")
+        self.label_3.setFont(font3)
+        self.label_3.setAlignment(Qt.AlignCenter)
+
+        # make text larger and white
+        self.label_3.setStyleSheet(u"color: white;\n"
+                                    "font-size: 24px;")
+
         self.label_2 = QLabel(self.centralwidget)
         self.label_2.setObjectName(u"label_2")
         self.label_2.setGeometry(QRect(40, 20, 711, 121))
@@ -233,6 +248,7 @@ class Ui_MainWindow(object):
         self.pushButton.raise_()
         self.pushButton_2.raise_()
         self.tableWidget.raise_()
+        self.label_3.raise_()
         self.label_2.raise_()
 
         self.retranslateUi(MainWindow)
@@ -371,60 +387,40 @@ class Ui_MainWindow(object):
             "MainWindow", u"TextLabel", None))
         self.label_2.setText(QCoreApplication.translate(
             "MainWindow", u"SOWS", None))
+        self.label_3.setText(QCoreApplication.translate("MainWindow", u"---", None))
+        
     # retranslateUi
 
-    # when push button 2 is clicked. we disable entire gui 
-    # by drawing a grey transparent overlay over the gui
-    # and start listening for audio
-    # when a note is detected we call the handleAudioSignal function and pass the note
-    # and re-enable the gui. we use this to tune the application to the lowest note
-    # and then we can use the table to map the notes to actions
-
     def on_pushButton_clicked(self):
+        if self.testing:
+            # delete the thread
+            self.audio_thread.stop()
+            self.audio_thread.join()
+            self.audio_thread = None
+            self.testing = False
+            self.label_3.setText("---")
+            self.updateSignalStatus(False)
+
+            # restart the audio thread
+            self.audio_thread = AudioProcessingThread(self.tuning_factor, self.buffer_size, self.samplerate, self.stream)
+            self.audio_thread.signal_detected.connect(self.handleAudioSignal)
+            self.audio_thread.start()
+            self.updateSignalStatus(True)
+
+        else:
+            #check if any thread is running
+            if self.audio_thread:
+                self.audio_thread.stop()
+                self.audio_thread.join()
+                self.audio_thread = None
+
+            # start audio thread
+            self.audio_thread = AudioProcessingThread(self.tuning_factor, self.buffer_size, self.samplerate, self.stream)
+            self.audio_thread.signal_detected.connect(self.handleAudioSignal)
+            self.audio_thread.start()
+            self.testing = True
+
         
-        # transparent overlay to block gui
-        print("hello    ")
-        self.pushButton.setEnabled(False)
-        self.comboBox.setEnabled(False)
-        self.pushButton.setEnabled(False)
-
-        tolerance = 0.9
-        win_s = 8192  # fft size
-        hop_s = buffer_size  # hop size
-        pitch_o = aubio.pitch("default", win_s, hop_s, samplerate)
-        pitch_o.set_unit("midi")
-        pitch_o.set_tolerance(tolerance)
-
-        while True:
-            try:
-                aubiobuffer = stream.read(buffer_size)
-                signal = np.fromstring(aubiobuffer, dtype=np.float32)
-
-                if len(signal) == 0:
-                    break
-                
-                pitch = pitch_o(signal)[0]
-
-                # this pitch is the low E string on a guitar
-
-                if pitch >0:
-                    pitch = int(round(pitch))
-                    notes = ["E", "F", "F#", "G", "G#", "A", "A#", "B", "C", "C#", "D", "D#"]
-
-                    # get tuning factor considering that the note was an E
-                    # this will be used to calculate the notes
-                    # we will get further notes relative to this note
-
-                    self.tuning_factor = lowest_pitch - pitch
-
-            except:
-                print("Error running")
-                break
-
-        self.pushButton.setEnabled(True)
-        self.comboBox.setEnabled(True)
-        self.pushButton.setEnabled(True)
-
     def changeDriver(self):
         
         print(self.audio_thread)
@@ -469,7 +465,12 @@ class Ui_MainWindow(object):
             print(e)
     
     def handleAudioSignal(self, note):
-        print(note)
+        # update the label_3 text
+        if self.testing:
+            self.label_3.setText(note)
+        else:
+            # the entire action programming based on note is done here
+            print(note)
     
     def updateSignalStatus(self, live):
         #change the signal status icon to signal.png instead of no_signal.png
@@ -529,7 +530,6 @@ class AudioProcessingThread(threading.Thread, QObject):
                     break
                 
                 pitch = pitch_o(signal)[0]
-                print(pitch)
 
                 if pitch >0:
                     pitch = int(round(pitch))
@@ -538,7 +538,11 @@ class AudioProcessingThread(threading.Thread, QObject):
                     # Calculate the octave and note relative to the tuning factor
                     octave = int((pitch + self.tuning_factor) / 12) - 1
                     note = notes[(pitch + self.tuning_factor) % 12]
-                    print(note)
+                
+                    # Emit the signal
+                    self.signal_detected.emit(note + str(octave))
+
+
             except Exception as e:
                 print("Error getting pitch")
                 print(e)
