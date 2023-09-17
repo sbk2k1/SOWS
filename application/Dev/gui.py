@@ -76,7 +76,7 @@ class Ui_MainWindow(object):
         self.pushButton = QPushButton(self.centralwidget)
         self.pushButton.setObjectName(u"pushButton")
         self.pushButton.setGeometry(QRect(620, 760, 61, 41))
-        self.pushButton.setStyleSheet(u"background-color: grey;")
+        self.pushButton.setStyleSheet(u"background-color: rgba(225, 233, 245, 1);")
         icon = QIcon()
         iconThemeName = u"Dark"
         if QIcon.hasThemeIcon(iconThemeName):
@@ -226,6 +226,11 @@ class Ui_MainWindow(object):
         self.tableWidget.verticalHeader().setVisible(False)
         self.tableWidget.verticalHeader().setMinimumSectionSize(32)
         self.tableWidget.verticalHeader().setDefaultSectionSize(44)
+
+        # make the table fixed size
+        self.tableWidget.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
+
+
         self.label = QLabel(self.centralwidget)
         self.label.setObjectName(u"label")
         self.label.setGeometry(QRect(0, 0, 1231, 831))
@@ -420,6 +425,9 @@ class Ui_MainWindow(object):
             self.audio_thread.start()
             self.updateSignalStatus(True)
 
+            # make button color back to original
+            self.pushButton.setStyleSheet(u"background-color: rgba(225, 233, 245, 1);")
+
         else:
             #check if any thread is running
             if self.audio_thread:
@@ -432,6 +440,9 @@ class Ui_MainWindow(object):
             self.audio_thread.signal_detected.connect(self.handleAudioSignal)
             self.audio_thread.start()
             self.testing = True
+
+            # change button color
+            self.pushButton.setStyleSheet(u"background-color: rgba(151, 153, 156, 1);")
 
         
     def changeDriver(self):
