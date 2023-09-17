@@ -8,8 +8,10 @@ import pyaudio
 import aubio
 import numpy as np
 import threading
+import os
 
 audio = pyaudio.PyAudio()
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 
@@ -27,6 +29,20 @@ class Ui_MainWindow(object):
         self.samplerate = 48000
         self.lowest_pitch = 5
         self.testing = False
+        
+        # get the image path
+        self.background_image = os.path.join(script_dir, "background.jpg")
+        self.background_image = self.background_image.replace("\\", "/")
+
+        self.green_signal = os.path.join(script_dir, "signal.png")
+        self.green_signal = self.green_signal.replace("\\", "/")
+
+        self.grey_signal = os.path.join(script_dir, "no_signal.png")
+        self.grey_signal = self.grey_signal.replace("\\", "/")
+
+        self.test_image = os.path.join(script_dir, "tune.png")
+        self.test_image = self.test_image.replace("\\", "/")
+
     
     def setupUi(self, MainWindow):
         if MainWindow.objectName():
@@ -66,7 +82,7 @@ class Ui_MainWindow(object):
         if QIcon.hasThemeIcon(iconThemeName):
             icon = QIcon.fromTheme(iconThemeName)
         else:
-            icon.addFile(u"tune.png", QSize(), QIcon.Normal, QIcon.Off)
+            icon.addFile(self.test_image, QSize(), QIcon.Normal, QIcon.Off)
 
         self.pushButton.setIcon(icon)
         self.pushButton.setIconSize(QSize(32, 30))
@@ -214,11 +230,8 @@ class Ui_MainWindow(object):
         self.label.setObjectName(u"label")
         self.label.setGeometry(QRect(0, 0, 1231, 831))
         self.label.setMinimumSize(QSize(0, 0))
-        self.label.setStyleSheet(u"background-image: url(background.jpg);\n"
-                                 "background-repeat: no-repeat;\n"
-                                 "")
-
-
+        self.label.setStyleSheet(f"background-image: url(" + self.background_image + ");\n"
+                               "background-position: center;\n")
         self.label_3 = QLabel(self.centralwidget)
         self.label_3.setObjectName(u"label_3")
         self.label_3.setGeometry(QRect(690, 760, 81, 41))
@@ -476,10 +489,10 @@ class Ui_MainWindow(object):
         #change the signal status icon to signal.png instead of no_signal.png
         icon = QIcon()
         if live == True:
-            icon.addFile(u"signal.png", QSize(), QIcon.Normal, QIcon.Off)
+            icon.addFile(self.green_signal, QSize(), QIcon.Normal, QIcon.Off)
             self.pushButton_2.setIcon(icon)
         else:
-            icon.addFile(u"no_signal.png", QSize(), QIcon.Normal, QIcon.Off)
+            icon.addFile(self.grey_signal, QSize(), QIcon.Normal, QIcon.Off)
             self.pushButton_2.setIcon(icon)
     
     # create
