@@ -11,10 +11,16 @@ import aubio
 import numpy as np
 import threading
 import os
+import sys
 
 # initializations
 audio = pyaudio.PyAudio()
-script_dir = os.path.dirname(os.path.abspath(__file__))
+script_dir = None
+if getattr(sys, 'frozen', False):
+        script_dir = os.path.dirname(sys.executable)
+elif __file__:
+    script_dir = os.path.dirname(__file__)
+script_dir = script_dir+"/assets"
 
 
 
@@ -50,6 +56,9 @@ class Ui_MainWindow(QMainWindow):
 
         self.test_image = os.path.join(script_dir, "tune.png")
         self.test_image = self.test_image.replace("\\", "/")
+
+        self.logo = os.path.join(script_dir, "logo.png")
+        self.logo = self.logo.replace("\\", "/")
 
     
     def setupUi(self, MainWindow):
@@ -322,6 +331,14 @@ class Ui_MainWindow(QMainWindow):
             "MainWindow", u"SOWS", None))
         MainWindow.setWindowFlags(Qt.WindowStaysOnTopHint)
 
+        # mainwindow icon
+        icon = QIcon()
+        icon.addFile(self.logo, QSize(), QIcon.Normal, QIcon.Off)
+        MainWindow.setWindowIcon(icon)
+
+        # set taskbar icon
+
+
 
         self.comboBox.setCurrentText(
             QCoreApplication.translate("MainWindow", u"Select Driver", None))
@@ -580,9 +597,7 @@ class Ui_MainWindow(QMainWindow):
             self.label_3.setText(note)
         else:
             # the entire action programming based on note is done here
-            # self.action_handler.handleAction(note)
-            keyboard.press_and_release("space")
-            # print(note)
+            self.action_handler.handleAction(note)
     
     # function to update the signal status icon
     def updateSignalStatus(self, live):
@@ -690,16 +705,20 @@ class ActionHandler(QObject):
                 keyboard.release('a')
         
         def turn45Left(self):
-            print("Turning 45 degrees left")
+            # turn 45 degrees left using pyautogui
+            pyautogui.moveRel(-100, 0, 0.5)
         
         def turn45Right(self):
-            print("Turning 45 degrees right")
+            # turn 45 degrees right using pyautogui
+            pyautogui.moveRel(100, 0, 0.5)
         
         def turn90Left(self):
-            print("Turning 90 degrees left")
+            # turn 90 degrees left using pyautogui
+            pyautogui.moveRel(-200, 0, 0.5)
         
         def turn90Right(self):
-            print("Turning 90 degrees right")
+            # turn 90 degrees right using pyautogui
+            pyautogui.moveRel(200, 0, 0.5)
         
         def jump(self):
             keyboard.press_and_release('space')
