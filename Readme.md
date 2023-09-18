@@ -7,4 +7,4 @@ This allows me to do that
 
 - [@sbk2k1](https://www.github.com/sbk2k1)
 
-![Logo](https://github.com/sbk2k1/SOWS/blob/master/screenshots/logo.png)
+![Logo](https://github.com/sbk2k1/SOWS/blob/master/screenshots/Capture.PNG)
